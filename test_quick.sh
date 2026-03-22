@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+set -euo pipefail
+DIMS="10000 50000 100000" NSWEEPS=2000 ITERATIONS=3 THREAD_COUNTS="2 4 8" PROCESS_COUNTS="2 4 8" ./test.sh
