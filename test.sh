@@ -18,6 +18,7 @@ mkdir -p "$results_dir"
 
 raw_all="$results_dir/all_runs.csv"
 raw_seq="$results_dir/JacobiSec.csv"
+raw_seq_o3="$results_dir/JacobiSecO3.csv"
 raw_thr="$results_dir/JacobiHilos.csv"
 raw_proc="$results_dir/JacobiProc.csv"
 summary="$results_dir/summary.csv"
@@ -34,6 +35,7 @@ make >/dev/null
 # =========================================================
 echo "implementation,n,nsweeps,workers,iteration,time_s" > "$raw_all"
 echo "implementation,n,nsweeps,workers,iteration,time_s" > "$raw_seq"
+echo "implementation,n,nsweeps,workers,iteration,time_s" > "$raw_seq_o3"
 echo "implementation,n,nsweeps,workers,iteration,time_s" > "$raw_thr"
 echo "implementation,n,nsweeps,workers,iteration,time_s" > "$raw_proc"
 
@@ -82,7 +84,7 @@ for ((iter=1; iter<=iterations; iter++)); do
     echo "  Iteración secuencial O3 $iter/$iterations"
     for dim in "${dimensions[@]}"; do
         t=$(./JacobiSecO3 "$dim" "$nSweeps")
-        append_run "seq_o3" "$dim" "$nSweeps" 1 "$iter" "$t" "$raw_seq"
+        append_run "seq_o3" "$dim" "$nSweeps" 1 "$iter" "$t" "$raw_seq_o3"
     done
 done
 
@@ -179,6 +181,7 @@ echo
 echo "Listo. Archivos generados en $results_dir/"
 echo "  - $raw_all"
 echo "  - $raw_seq"
+echo "  - $raw_seq_o3"
 echo "  - $raw_thr"
 echo "  - $raw_proc"
 echo "  - $summary"
