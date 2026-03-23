@@ -18,6 +18,7 @@ mkdir -p "$results_dir"
 
 raw_all="$results_dir/all_runs.csv"
 raw_seq="$results_dir/JacobiSec.csv"
+raw_seq_mem="$results_dir/JacobiSecMem.csv"
 raw_seq_o3="$results_dir/JacobiSecO3.csv"
 raw_thr="$results_dir/JacobiHilos.csv"
 raw_proc="$results_dir/JacobiProc.csv"
@@ -35,6 +36,7 @@ make >/dev/null
 # =========================================================
 echo "implementation,n,nsweeps,workers,iteration,time_s" > "$raw_all"
 echo "implementation,n,nsweeps,workers,iteration,time_s" > "$raw_seq"
+echo "implementation,n,nsweeps,workers,iteration,time_s" > "$raw_seq_mem"
 echo "implementation,n,nsweeps,workers,iteration,time_s" > "$raw_seq_o3"
 echo "implementation,n,nsweeps,workers,iteration,time_s" > "$raw_thr"
 echo "implementation,n,nsweeps,workers,iteration,time_s" > "$raw_proc"
@@ -57,6 +59,7 @@ append_run() {
 # =========================================================
 echo "[warmup] Ejecutando calentamiento..."
 ./JacobiSec 10000 100 >/dev/null 2>&1 || true
+./JacobiSecMem 10000 100 >/dev/null 2>&1 || true
 ./JacobiSecO3 10000 100 >/dev/null 2>&1 || true
 ./JacobiHilos 10000 100 2 >/dev/null 2>&1 || true
 ./JacobiProc 10000 100 2 >/dev/null 2>&1 || true
@@ -66,7 +69,7 @@ echo "[warmup] Ejecutando calentamiento..."
 # Orden: iteración -> dimensión
 # Así no quedan las 10 repeticiones del mismo n seguidas
 # =========================================================
-echo "[1/4] Ejecutando secuencial base (O0)..."
+echo "[1/5] Ejecutando secuencial base (O0)..."
 for ((iter=1; iter<=iterations; iter++)); do
     echo "  Iteración secuencial $iter/$iterations"
     for dim in "${dimensions[@]}"; do
@@ -76,10 +79,23 @@ for ((iter=1; iter<=iterations; iter++)); do
 done
 
 # =========================================================
+# Secuencial optimizada por memoria (O0)
+# Orden: iteración -> dimensión
+# =========================================================
+echo "[2/5] Ejecutando secuencial con optimizacion de memoria (O0)..."
+for ((iter=1; iter<=iterations; iter++)); do
+    echo "  Iteración secuencial memoria $iter/$iterations"
+    for dim in "${dimensions[@]}"; do
+        t=$(./JacobiSecMem "$dim" "$nSweeps")
+        append_run "seq_mem" "$dim" "$nSweeps" 1 "$iter" "$t" "$raw_seq_mem"
+    done
+done
+
+# =========================================================
 # Secuencial optimizada (-O3)
 # Orden: iteración -> dimensión
 # =========================================================
-echo "[2/4] Ejecutando secuencial optimizada (O3)..."
+echo "[3/5] Ejecutando secuencial optimizada (O3)..."
 for ((iter=1; iter<=iterations; iter++)); do
     echo "  Iteración secuencial O3 $iter/$iterations"
     for dim in "${dimensions[@]}"; do
@@ -93,7 +109,7 @@ done
 # Orden: worker -> iteración -> dimensión
 # Se completa una ronda entera de un worker antes de pasar al siguiente
 # =========================================================
-echo "[3/4] Ejecutando hilos (O0)..."
+echo "[4/5] Ejecutando hilos (O0)..."
 for workers in "${thread_counts[@]}"; do
     echo "  Worker threads=$workers"
     for ((iter=1; iter<=iterations; iter++)); do
@@ -109,7 +125,7 @@ done
 # Procesos (sin optimizacion)
 # Orden: worker -> iteración -> dimensión
 # =========================================================
-echo "[4/4] Ejecutando procesos (O0)..."
+echo "[5/5] Ejecutando procesos (O0)..."
 for workers in "${process_counts[@]}"; do
     echo "  Worker processes=$workers"
     for ((iter=1; iter<=iterations; iter++)); do
@@ -181,6 +197,7 @@ echo
 echo "Listo. Archivos generados en $results_dir/"
 echo "  - $raw_all"
 echo "  - $raw_seq"
+echo "  - $raw_seq_mem"
 echo "  - $raw_seq_o3"
 echo "  - $raw_thr"
 echo "  - $raw_proc"

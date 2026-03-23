@@ -21,6 +21,7 @@ int init_context_heap(JacobiContext *ctx, int n, int nsweeps, int workers);
 void free_context_heap(JacobiContext *ctx);
 void init_problem(JacobiContext *ctx);
 void jacobi_seq(JacobiContext *ctx);
+int jacobi_seq_mem(JacobiContext *ctx);
 int jacobi_threads(JacobiContext *ctx);
 int jacobi_processes(JacobiContext *ctx);
 
