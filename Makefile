@@ -1,46 +1,26 @@
 CC      = gcc
-CFLAGS  = -O3 -Wall -Wextra -std=c11 -D_XOPEN_SOURCE=700 -Iinclude
+CSTD    = -std=c11 -D_XOPEN_SOURCE=700 -Iinclude
+CWARN   = -Wall -Wextra
+CFLAGS_NOOPT = $(CWARN) $(CSTD) -O0
+CFLAGS_O3    = $(CWARN) $(CSTD) -O3
 LDFLAGS =
 THREADS = -pthread
 
-COMMON_OBJS = src/common.o
-SEQ_OBJS    = $(COMMON_OBJS) src/jacobi_seq.o src/main_seq.o
-THR_OBJS    = $(COMMON_OBJS) src/jacobi_threads.o src/main_threads.o
-PROC_OBJS   = $(COMMON_OBJS) src/jacobi_processes.o src/main_processes.o
+all: JacobiSec JacobiSecO3 JacobiHilos JacobiProc
 
-all: JacobiSec JacobiHilos JacobiProc
+JacobiSec:
+	$(CC) $(CFLAGS_NOOPT) -o $@ src/common.c src/jacobi_seq.c src/main_seq.c $(LDFLAGS)
 
-JacobiSec: $(SEQ_OBJS)
-	$(CC) $(CFLAGS) -o $@ $(SEQ_OBJS) $(LDFLAGS)
+JacobiSecO3:
+	$(CC) $(CFLAGS_O3) -o $@ src/common.c src/jacobi_seq.c src/main_seq.c $(LDFLAGS)
 
-JacobiHilos: $(THR_OBJS)
-	$(CC) $(CFLAGS) -o $@ $(THR_OBJS) $(THREADS) $(LDFLAGS)
+JacobiHilos:
+	$(CC) $(CFLAGS_NOOPT) -o $@ src/common.c src/jacobi_threads.c src/main_threads.c $(THREADS) $(LDFLAGS)
 
-JacobiProc: $(PROC_OBJS)
-	$(CC) $(CFLAGS) -o $@ $(PROC_OBJS) $(LDFLAGS)
-
-src/common.o: src/common.c include/jacobi.h
-	$(CC) $(CFLAGS) -c $< -o $@
-
-src/jacobi_seq.o: src/jacobi_seq.c include/jacobi.h
-	$(CC) $(CFLAGS) -c $< -o $@
-
-src/jacobi_threads.o: src/jacobi_threads.c include/jacobi.h
-	$(CC) $(CFLAGS) -c $< -o $@
-
-src/jacobi_processes.o: src/jacobi_processes.c include/jacobi.h
-	$(CC) $(CFLAGS) -c $< -o $@
-
-src/main_seq.o: src/main_seq.c include/jacobi.h
-	$(CC) $(CFLAGS) -c $< -o $@
-
-src/main_threads.o: src/main_threads.c include/jacobi.h
-	$(CC) $(CFLAGS) -c $< -o $@
-
-src/main_processes.o: src/main_processes.c include/jacobi.h
-	$(CC) $(CFLAGS) -c $< -o $@
+JacobiProc:
+	$(CC) $(CFLAGS_NOOPT) -o $@ src/common.c src/jacobi_processes.c src/main_processes.c $(LDFLAGS)
 
 clean:
-	rm -f src/*.o JacobiSec JacobiHilos JacobiProc
+	rm -f src/*.o JacobiSec JacobiSecO3 JacobiHilos JacobiProc
 
 .PHONY: all clean

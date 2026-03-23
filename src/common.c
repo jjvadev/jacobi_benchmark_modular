@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/time.h>
+#include <time.h>
 
 static double rhs_value(double x) {
     /* Fuente simple del ejemplo base. Si tu profesor exige otra, cambia esta linea. */
@@ -11,9 +11,9 @@ static double rhs_value(double x) {
 }
 
 double wall_time_seconds(void) {
-    struct timeval t;
-    gettimeofday(&t, NULL);
-    return (double)t.tv_sec + (double)t.tv_usec / 1e6;
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return (double)t.tv_sec + (double)t.tv_nsec / 1e9;
 }
 
 int init_context_heap(JacobiContext *ctx, int n, int nsweeps, int workers) {

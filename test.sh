@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Fuerza punto decimal (.) para parseo y salida numerica consistente en CSV.
+export LC_ALL=C
+
 # =========================================================
 # Configuración
 # =========================================================
 dimensions=(10000 100000 1000000 2500000 4000000 6000000)
 nSweeps=15000
 iterations=10
-thread_counts=(2 4 8 16 32)
-process_counts=(2 4 8 16 32)
+thread_counts=(2 4 8 16)
+process_counts=(2 4 8 16)
 results_dir="results"
 
 mkdir -p "$results_dir"
@@ -52,15 +55,16 @@ append_run() {
 # =========================================================
 echo "[warmup] Ejecutando calentamiento..."
 ./JacobiSec 10000 100 >/dev/null 2>&1 || true
+./JacobiSecO3 10000 100 >/dev/null 2>&1 || true
 ./JacobiHilos 10000 100 2 >/dev/null 2>&1 || true
 ./JacobiProc 10000 100 2 >/dev/null 2>&1 || true
 
 # =========================================================
-# Secuencial
+# Secuencial base (sin optimizacion)
 # Orden: iteración -> dimensión
 # Así no quedan las 10 repeticiones del mismo n seguidas
 # =========================================================
-echo "[1/3] Ejecutando secuencial..."
+echo "[1/4] Ejecutando secuencial base (O0)..."
 for ((iter=1; iter<=iterations; iter++)); do
     echo "  Iteración secuencial $iter/$iterations"
     for dim in "${dimensions[@]}"; do
@@ -70,11 +74,24 @@ for ((iter=1; iter<=iterations; iter++)); do
 done
 
 # =========================================================
-# Hilos
+# Secuencial optimizada (-O3)
+# Orden: iteración -> dimensión
+# =========================================================
+echo "[2/4] Ejecutando secuencial optimizada (O3)..."
+for ((iter=1; iter<=iterations; iter++)); do
+    echo "  Iteración secuencial O3 $iter/$iterations"
+    for dim in "${dimensions[@]}"; do
+        t=$(./JacobiSecO3 "$dim" "$nSweeps")
+        append_run "seq_o3" "$dim" "$nSweeps" 1 "$iter" "$t" "$raw_seq"
+    done
+done
+
+# =========================================================
+# Hilos (sin optimizacion)
 # Orden: worker -> iteración -> dimensión
 # Se completa una ronda entera de un worker antes de pasar al siguiente
 # =========================================================
-echo "[2/3] Ejecutando hilos..."
+echo "[3/4] Ejecutando hilos (O0)..."
 for workers in "${thread_counts[@]}"; do
     echo "  Worker threads=$workers"
     for ((iter=1; iter<=iterations; iter++)); do
@@ -87,10 +104,10 @@ for workers in "${thread_counts[@]}"; do
 done
 
 # =========================================================
-# Procesos
+# Procesos (sin optimizacion)
 # Orden: worker -> iteración -> dimensión
 # =========================================================
-echo "[3/3] Ejecutando procesos..."
+echo "[4/4] Ejecutando procesos (O0)..."
 for workers in "${process_counts[@]}"; do
     echo "  Worker processes=$workers"
     for ((iter=1; iter<=iterations; iter++)); do
@@ -126,7 +143,7 @@ END {
         if (var<0) var=0
         std=sqrt(var)
         split(k,a,FS)
-        print a[1],a[2],a[3],a[4],avg,min[k],max[k],std,count[k]
+        printf "%s,%s,%s,%s,%.6f,%.6f,%.6f,%.6f,%d\n", a[1],a[2],a[3],a[4],avg,min[k],max[k],std,count[k]
     }
 }
 ' "$raw_all" | sort -t, -k1,1 -k2,2n -k4,4n > "$summary"
@@ -147,9 +164,13 @@ $1=="seq" {
 {
     key=$2","$3
     if (key in seq) {
-        speedup=seq[key]/$5
-        eff=speedup/$4
-        print $1,$2,$3,$4,$5,seq[key],sprintf("%.6f",speedup),sprintf("%.6f",eff)
+        if ($5+0 > 0 && $4+0 > 0) {
+            speedup=seq[key]/$5
+            eff=speedup/$4
+            printf "%s,%s,%s,%s,%.6f,%.6f,%.6f,%.6f\n", $1,$2,$3,$4,$5,seq[key],speedup,eff
+        } else {
+            printf "%s,%s,%s,%s,%.6f,%.6f,NA,NA\n", $1,$2,$3,$4,$5,seq[key]
+        }
     }
 }
 ' "$summary" | sort -t, -k1,1 -k2,2n -k4,4n > "$speedup"
