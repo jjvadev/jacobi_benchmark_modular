@@ -1,5 +1,6 @@
 #include "jacobi.h"
 
+#include <math.h>
 #include <stdlib.h>
 
 int jacobi_seq_mem(JacobiContext *ctx) {
@@ -9,6 +10,8 @@ int jacobi_seq_mem(JacobiContext *ctx) {
     const double *g;
     int i;
     int sweep;
+    int sweeps_done = 0;
+    double last_residual_rms = 0.0;
 
     if (ctx == NULL) {
         return -1;
@@ -35,14 +38,26 @@ int jacobi_seq_mem(JacobiContext *ctx) {
         const double *restrict src = a;
         const double *restrict rhs = g;
         double *tmp;
+        double residual_sq_sum = 0.0;
 
         for (i = 1; i < ctx->n; ++i) {
             dst[i] = 0.5 * (src[i - 1] + src[i + 1] + rhs[i]);
         }
 
+        for (i = 1; i < ctx->n; ++i) {
+            double ri = (-dst[i - 1] + 2.0 * dst[i] - dst[i + 1]) / ctx->h2 - ctx->f[i];
+            residual_sq_sum += ri * ri;
+        }
+
         tmp = a;
         a = b;
         b = tmp;
+
+        sweeps_done = sweep + 1;
+        last_residual_rms = sqrt(residual_sq_sum / (double)(ctx->n + 1));
+        if (last_residual_rms <= ctx->tolerance) {
+            break;
+        }
     }
 
     if (a != ctx->u) {
@@ -50,6 +65,9 @@ int jacobi_seq_mem(JacobiContext *ctx) {
             ctx->u[i] = a[i];
         }
     }
+
+    ctx->sweeps_done = sweeps_done;
+    ctx->last_error = last_residual_rms;
 
     free(scaled_rhs);
     return 0;

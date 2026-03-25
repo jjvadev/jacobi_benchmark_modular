@@ -5,13 +5,21 @@ set -euo pipefail
 export LC_ALL=C
 
 # =========================================================
-# Configuración
+# Configuracion
 # =========================================================
-dimensions=(10000 100000 1000000 2500000 4000000 6000000)
-nSweeps=15000
-iterations=10
-thread_counts=(2 4 8 16)
-process_counts=(2 4 8 16)
+K_VALUES_STR="${K_VALUES:- 5 10 12 14}"
+NSWEEPS="${NSWEEPS:-5000000}"
+ITERATIONS="${ITERATIONS:-4}"
+THREAD_COUNTS_STR="${THREAD_COUNTS:-2 4 8 16}"
+PROCESS_COUNTS_STR="${PROCESS_COUNTS:-2 4 8 16}"
+TOLERANCE="${TOLERANCE:-1e-30}"
+
+read -r -a k_values <<< "$K_VALUES_STR"
+read -r -a thread_counts <<< "$THREAD_COUNTS_STR"
+read -r -a process_counts <<< "$PROCESS_COUNTS_STR"
+
+nSweeps="$NSWEEPS"
+iterations="$ITERATIONS"
 results_dir="results"
 
 mkdir -p "$results_dir"
@@ -54,15 +62,23 @@ append_run() {
     echo "$impl,$n,$sweeps,$workers,$iter,$time_s" >> "$raw_all"
 }
 
+nodes_from_k() {
+    local k="$1"
+    if (( k < 1 || k > 29 )); then
+        return 1
+    fi
+    echo $(( (1 << k) + 1 ))
+}
+
 # =========================================================
 # Warm-up opcional
 # =========================================================
 echo "[warmup] Ejecutando calentamiento..."
-./JacobiSec 10000 100 >/dev/null 2>&1 || true
-./JacobiSecMem 10000 100 >/dev/null 2>&1 || true
-./JacobiSecO3 10000 100 >/dev/null 2>&1 || true
-./JacobiHilos 10000 100 2 >/dev/null 2>&1 || true
-./JacobiProc 10000 100 2 >/dev/null 2>&1 || true
+./JacobiSec 14 100 >/dev/null 2>&1 || true
+./JacobiSecMem 14 100 >/dev/null 2>&1 || true
+./JacobiSecO3 14 100 >/dev/null 2>&1 || true
+./JacobiHilos 14 100 2 >/dev/null 2>&1 || true
+./JacobiProc 14 100 2 >/dev/null 2>&1 || true
 
 # =========================================================
 # Secuencial base (sin optimizacion)
@@ -72,9 +88,10 @@ echo "[warmup] Ejecutando calentamiento..."
 echo "[1/5] Ejecutando secuencial base (O0)..."
 for ((iter=1; iter<=iterations; iter++)); do
     echo "  Iteración secuencial $iter/$iterations"
-    for dim in "${dimensions[@]}"; do
-        t=$(./JacobiSec "$dim" "$nSweeps")
-        append_run "seq" "$dim" "$nSweeps" 1 "$iter" "$t" "$raw_seq"
+    for k in "${k_values[@]}"; do
+        n=$(nodes_from_k "$k")
+        t=$(./JacobiSec "$k" "$nSweeps" "$TOLERANCE")
+        append_run "seq" "$n" "$nSweeps" 1 "$iter" "$t" "$raw_seq"
     done
 done
 
@@ -85,9 +102,10 @@ done
 echo "[2/5] Ejecutando secuencial con optimizacion de memoria (O0)..."
 for ((iter=1; iter<=iterations; iter++)); do
     echo "  Iteración secuencial memoria $iter/$iterations"
-    for dim in "${dimensions[@]}"; do
-        t=$(./JacobiSecMem "$dim" "$nSweeps")
-        append_run "seq_mem" "$dim" "$nSweeps" 1 "$iter" "$t" "$raw_seq_mem"
+    for k in "${k_values[@]}"; do
+        n=$(nodes_from_k "$k")
+        t=$(./JacobiSecMem "$k" "$nSweeps" "$TOLERANCE")
+        append_run "seq_mem" "$n" "$nSweeps" 1 "$iter" "$t" "$raw_seq_mem"
     done
 done
 
@@ -98,9 +116,10 @@ done
 echo "[3/5] Ejecutando secuencial optimizada (O3)..."
 for ((iter=1; iter<=iterations; iter++)); do
     echo "  Iteración secuencial O3 $iter/$iterations"
-    for dim in "${dimensions[@]}"; do
-        t=$(./JacobiSecO3 "$dim" "$nSweeps")
-        append_run "seq_o3" "$dim" "$nSweeps" 1 "$iter" "$t" "$raw_seq_o3"
+    for k in "${k_values[@]}"; do
+        n=$(nodes_from_k "$k")
+        t=$(./JacobiSecO3 "$k" "$nSweeps" "$TOLERANCE")
+        append_run "seq_o3" "$n" "$nSweeps" 1 "$iter" "$t" "$raw_seq_o3"
     done
 done
 
@@ -114,9 +133,10 @@ for workers in "${thread_counts[@]}"; do
     echo "  Worker threads=$workers"
     for ((iter=1; iter<=iterations; iter++)); do
         echo "    Iteración $iter/$iterations"
-        for dim in "${dimensions[@]}"; do
-            t=$(./JacobiHilos "$dim" "$nSweeps" "$workers")
-            append_run "threads" "$dim" "$nSweeps" "$workers" "$iter" "$t" "$raw_thr"
+        for k in "${k_values[@]}"; do
+            n=$(nodes_from_k "$k")
+            t=$(./JacobiHilos "$k" "$nSweeps" "$workers" "$TOLERANCE")
+            append_run "threads" "$n" "$nSweeps" "$workers" "$iter" "$t" "$raw_thr"
         done
     done
 done
@@ -130,9 +150,10 @@ for workers in "${process_counts[@]}"; do
     echo "  Worker processes=$workers"
     for ((iter=1; iter<=iterations; iter++)); do
         echo "    Iteración $iter/$iterations"
-        for dim in "${dimensions[@]}"; do
-            t=$(./JacobiProc "$dim" "$nSweeps" "$workers")
-            append_run "processes" "$dim" "$nSweeps" "$workers" "$iter" "$t" "$raw_proc"
+        for k in "${k_values[@]}"; do
+            n=$(nodes_from_k "$k")
+            t=$(./JacobiProc "$k" "$nSweeps" "$workers" "$TOLERANCE")
+            append_run "processes" "$n" "$nSweeps" "$workers" "$iter" "$t" "$raw_proc"
         done
     done
 done

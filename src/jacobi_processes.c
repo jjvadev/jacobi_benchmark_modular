@@ -1,5 +1,6 @@
 #include "jacobi.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,6 +13,7 @@ typedef struct {
     double *u;
     double *utmp;
     double *f;
+    double *local_residual_sq_sums;
 } SharedArrays;
 
 static void split_range(int n, int workers, int wid, int *start, int *end) {
@@ -44,6 +46,9 @@ static void cleanup_shared(SharedArrays *sa, int n) {
     if (sa->f != NULL) {
         munmap(sa->f, bytes);
     }
+    if (sa->local_residual_sq_sums != NULL) {
+        munmap(sa->local_residual_sq_sums, (size_t)MAX_WORKERS * sizeof(double));
+    }
 }
 
 int jacobi_processes(JacobiContext *ctx) {
@@ -56,6 +61,8 @@ int jacobi_processes(JacobiContext *ctx) {
     int i;
     int status;
     char command;
+    int sweeps_done = 0;
+    double last_residual_rms = 0.0;
 
     if (ctx == NULL) {
         return -1;
@@ -66,7 +73,8 @@ int jacobi_processes(JacobiContext *ctx) {
     sa.u = (double *)map_shared_bytes(bytes);
     sa.utmp = (double *)map_shared_bytes(bytes);
     sa.f = (double *)map_shared_bytes(bytes);
-    if (sa.u == NULL || sa.utmp == NULL || sa.f == NULL) {
+    sa.local_residual_sq_sums = (double *)map_shared_bytes((size_t)MAX_WORKERS * sizeof(double));
+    if (sa.u == NULL || sa.utmp == NULL || sa.f == NULL || sa.local_residual_sq_sums == NULL) {
         cleanup_shared(&sa, ctx->n);
         return -1;
     }
@@ -74,6 +82,9 @@ int jacobi_processes(JacobiContext *ctx) {
     memcpy(sa.u, ctx->u, bytes);
     memcpy(sa.utmp, ctx->utmp, bytes);
     memcpy(sa.f, ctx->f, bytes);
+    for (i = 0; i < MAX_WORKERS; ++i) {
+        sa.local_residual_sq_sums[i] = 0.0;
+    }
 
     cmd_parent_to_child = (int *)malloc((size_t)ctx->workers * 2 * sizeof(int));
     ack_child_to_parent = (int *)malloc((size_t)ctx->workers * 2 * sizeof(int));
@@ -121,13 +132,25 @@ int jacobi_processes(JacobiContext *ctx) {
                 if (command == 'Q') {
                     break;
                 } else if (command == 'A') {
+                    double local_sum = 0.0;
                     for (j = start; j < end; ++j) {
                         sa.utmp[j] = 0.5 * (sa.u[j - 1] + sa.u[j + 1] + ctx->h2 * sa.f[j]);
+                        {
+                            double ri = (-sa.utmp[j - 1] + 2.0 * sa.utmp[j] - sa.utmp[j + 1]) / ctx->h2 - sa.f[j];
+                            local_sum += ri * ri;
+                        }
                     }
+                    sa.local_residual_sq_sums[w] = local_sum;
                 } else if (command == 'B') {
+                    double local_sum = 0.0;
                     for (j = start; j < end; ++j) {
                         sa.u[j] = 0.5 * (sa.utmp[j - 1] + sa.utmp[j + 1] + ctx->h2 * sa.f[j]);
+                        {
+                            double ri = (-sa.u[j - 1] + 2.0 * sa.u[j] - sa.u[j + 1]) / ctx->h2 - sa.f[j];
+                            local_sum += ri * ri;
+                        }
                     }
+                    sa.local_residual_sq_sums[w] = local_sum;
                 }
                 if (command == 'A' || command == 'B') {
                     if (write(ack[1], &ack_byte, 1) != 1) {
@@ -161,6 +184,18 @@ int jacobi_processes(JacobiContext *ctx) {
                 return -1;
             }
         }
+
+        {
+            double global_sq_sum = 0.0;
+            for (w = 0; w < ctx->workers; ++w) {
+                global_sq_sum += sa.local_residual_sq_sums[w];
+            }
+            sweeps_done = i + 1;
+            last_residual_rms = sqrt(global_sq_sum / (double)(ctx->n + 1));
+            if (last_residual_rms <= ctx->tolerance) {
+                break;
+            }
+        }
     }
 
     command = 'Q';
@@ -174,11 +209,14 @@ int jacobi_processes(JacobiContext *ctx) {
         waitpid(pids[w], &status, 0);
     }
 
-    if ((ctx->nsweeps & 1) == 0) {
+    if ((sweeps_done & 1) == 0) {
         memcpy(ctx->u, sa.u, bytes);
     } else {
         memcpy(ctx->u, sa.utmp, bytes);
     }
+
+    ctx->sweeps_done = sweeps_done;
+    ctx->last_error = last_residual_rms;
 
     free(cmd_parent_to_child);
     free(ack_child_to_parent);
