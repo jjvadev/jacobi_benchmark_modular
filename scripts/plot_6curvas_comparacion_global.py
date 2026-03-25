@@ -15,6 +15,7 @@ from pathlib import Path
 import csv
 import numpy as np
 import matplotlib.pyplot as plt
+import math
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -40,6 +41,9 @@ def load_average_sequential(path: Path) -> dict:
         reader = csv.DictReader(f)
         for row in reader:
             n = int(row["n"])
+            k = int(round(math.log2(n - 1)))
+            if (1 << k) + 1 != n:
+                continue
             time_s = float(row["time_s"])
             
             if n not in grouped:
@@ -60,6 +64,9 @@ def load_average_by_workers(path: Path, implementation: str, workers_targets: tu
                 continue
             
             n = int(row["n"])
+            k = int(round(math.log2(n - 1)))
+            if (1 << k) + 1 != n:
+                continue
             workers = int(row["workers"])
             time_s = float(row["time_s"])
             
@@ -105,7 +112,7 @@ def main():
     )
     
     if not common_sizes:
-        raise ValueError("No hay tamaños N en común entre todos los datos.")
+        raise ValueError("No hay valores N en comun entre todos los datos.")
     
     # Verificar que tenemos datos para workers 8 y 16
     for n in common_sizes:
@@ -117,7 +124,7 @@ def main():
                 raise ValueError(f"Faltan datos processes={w} para N={n}")
     
     # Calcular speedups
-    x_pos = np.arange(len(common_sizes))
+    x_pos = np.array(common_sizes, dtype=float)
     
     seq_baseline = np.ones(len(common_sizes), dtype=float)
     seq_mem_speedup = speedup_line(seq, seq_mem, common_sizes)
@@ -149,10 +156,12 @@ def main():
     
     ax.set_title("Comparación Global: Speedup de Optimizaciones y Paralelismo", 
                  fontsize=14, fontweight="bold")
-    ax.set_xlabel("Tamaño del problema (N)", fontsize=12)
+    ax.set_xlabel("Tamano del problema N (k como referencia)", fontsize=12)
     ax.set_ylabel("Speedup respecto a seq(O0)", fontsize=12)
-    ax.set_xticks(x_pos)
-    ax.set_xticklabels([str(n) for n in common_sizes])
+    ax.set_xscale("log", base=2)
+    ax.set_xticks(common_sizes)
+    tick_labels = [f"{n}\n(k={int(round(math.log2(n - 1)))})" for n in common_sizes]
+    ax.set_xticklabels(tick_labels)
     ax.grid(True, alpha=0.3)
     ax.legend(loc="best", fontsize=10)
     
@@ -164,12 +173,13 @@ def main():
     print("\n" + "="*110)
     print("RESUMEN GLOBAL: Speedup de todas las variantes")
     print("="*110)
-    print(f"{'N':<10} {'seq':<8} {'seq_mem':<12} {'seq_o3':<12} {'threads_8':<12} {'threads_16':<12} {'proc_8':<12} {'proc_16':<12}")
+    print(f"{'N':<10} {'k':<6} {'seq':<8} {'seq_mem':<12} {'seq_o3':<12} {'threads_8':<12} {'threads_16':<12} {'proc_8':<12} {'proc_16':<12}")
     print("-"*110)
     
     for i, n in enumerate(common_sizes):
+        k = int(round(math.log2(n - 1)))
         print(
-            f"{n:<10} {seq_baseline[i]:<8.2f}x {seq_mem_speedup[i]:<12.2f}x {seq_o3_speedup[i]:<12.2f}x "
+            f"{n:<10} {k:<6} {seq_baseline[i]:<8.2f}x {seq_mem_speedup[i]:<12.2f}x {seq_o3_speedup[i]:<12.2f}x "
             f"{threads_8_speedup[i]:<12.2f}x {threads_16_speedup[i]:<12.2f}x {processes_8_speedup[i]:<12.2f}x {processes_16_speedup[i]:<12.2f}x"
         )
     
