@@ -40,7 +40,7 @@
  */
 typedef struct {
     /* PARAMETROS DE ENTRADA */
-    int n;              /* numero de subintervalos (nodos = n+1) */
+    int n;              /* numero de nodos de la malla (incluye fronteras) */
     int nsweeps;        /* iteraciones maximas permitidas */
     int workers;        /* numero de hilos o procesos */
 
@@ -48,7 +48,7 @@ typedef struct {
     int sweeps_done;    /* iteraciones realizadas */
 
     /* PARAMETROS GEOMETRICOS (precalculados) */
-    double h;           /* espaciamiento de la malla: h = 1/(n+1) */
+    double h;           /* espaciamiento de la malla: h = 1/(n-1) */
     double h2;          /* h al cuadrado, aparece en la formula Jacobi */
 
     /* CONVERGENCIA */

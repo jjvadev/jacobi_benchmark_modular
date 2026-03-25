@@ -3,7 +3,7 @@ CSTD    = -std=c11 -D_XOPEN_SOURCE=700 -Iinclude
 CWARN   = -Wall -Wextra
 CFLAGS_NOOPT = $(CWARN) $(CSTD) -O0
 CFLAGS_O3    = $(CWARN) $(CSTD) -O3
-LDFLAGS =
+LDFLAGS = -lm
 THREADS = -pthread
 
 all: JacobiSec JacobiSecMem JacobiSecO3 JacobiHilos JacobiProc
