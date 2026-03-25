@@ -7,9 +7,9 @@ export LC_ALL=C
 # =========================================================
 # Configuracion
 # =========================================================
-K_VALUES_STR="${K_VALUES:- 5 10 12 14}"
-NSWEEPS="${NSWEEPS:-5000000}"
-ITERATIONS="${ITERATIONS:-4}"
+K_VALUES_STR="${K_VALUES:- 10 12 14 17 20 22}"
+NSWEEPS="${NSWEEPS:-15000}"
+ITERATIONS="${ITERATIONS:-5}"
 THREAD_COUNTS_STR="${THREAD_COUNTS:-2 4 8 16}"
 PROCESS_COUNTS_STR="${PROCESS_COUNTS:-2 4 8 16}"
 TOLERANCE="${TOLERANCE:-1e-30}"
