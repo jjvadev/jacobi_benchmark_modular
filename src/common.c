@@ -65,7 +65,7 @@ double wall_time_seconds(void) {
  *
  *  PARAMETROS:
  *    ctx      - estructura a llenar
- *    n        - numero de subintervalos
+ *    n        - numero de nodos
  *    nsweeps  - iteraciones maximas
  *    workers  - numero de hilos/procesos
  *
@@ -73,7 +73,7 @@ double wall_time_seconds(void) {
  *  1. Valida parametros (n>1, workers <= MAX_WORKERS, etc)
  *  2. Limpia ctx con memset (lo pone a cero)
  *  3. Calcula parametros geometricos (h, h2)
- *  4. Reserva memoria para u[], utmp[], f[] (cada uno n+1 elementos)
+ *  4. Reserva memoria para u[], utmp[], f[] (cada uno n elementos)
  *  5. Llama a init_problem() para llenar f[i] en cada nodo
  *
  *  MEMORIA:
@@ -105,7 +105,7 @@ int init_context_heap(JacobiContext *ctx, int n, int nsweeps, int workers) {
     ctx->sweeps_done = 0;
 
     /* Calcular parametros geometricos (precalculados para eficiencia) */
-    ctx->h = 1.0 / (double)n;   /* espaciamiento: h = 1 / n */
+    ctx->h = 1.0 / (double)(n - 1);   /* espaciamiento: h = 1 / (n-1) */
     ctx->h2 = ctx->h * ctx->h;  /* h al cuadrado (aparece en Jacobi) */
 
     /* Configurar criterio de convergencia */
@@ -113,7 +113,7 @@ int init_context_heap(JacobiContext *ctx, int n, int nsweeps, int workers) {
     ctx->last_error = 0.0;
 
     /* Reservar memoria para los tres arreglos principales */
-    bytes = (size_t)(n + 1) * sizeof(double);
+    bytes = (size_t)n * sizeof(double);
     ctx->u = (double *)malloc(bytes);      /* solucion actual */
     ctx->utmp = (double *)malloc(bytes);   /* solucion nueva (temporal) */
     ctx->f = (double *)malloc(bytes);      /* termino forzante */
@@ -143,7 +143,7 @@ int init_context_heap(JacobiContext *ctx, int n, int nsweeps, int workers) {
  *
  *  Condiciones de Dirichlet (frontera fija):
  *    u[0]   = 0.0     <- frontera izquierda
- *    u[n]   = 0.0     <- frontera derecha
+ *    u[n-1] = 0.0     <- frontera derecha
  *  Estos valores NUNCA cambian durante las iteraciones.
  *
  *  PARAMETROS:
@@ -160,18 +160,18 @@ void init_problem(JacobiContext *ctx) {
 
     /* Establecer condiciones de frontera (Dirichlet) */
     ctx->u[0] = 0.0;
-    ctx->u[ctx->n] = 0.0;
+    ctx->u[ctx->n - 1] = 0.0;
     ctx->utmp[0] = 0.0;
-    ctx->utmp[ctx->n] = 0.0;
+    ctx->utmp[ctx->n - 1] = 0.0;
 
     /* Inicializar u[] y utmp[] a cero (estimacion inicial) */
-    for (i = 1; i < ctx->n; ++i) {
+    for (i = 1; i < ctx->n - 1; ++i) {
         ctx->u[i] = 0.0;
         ctx->utmp[i] = 0.0;
     }
 
     /* Calcular termino forzante f[i] en cada nodo */
-    for (i = 0; i <= ctx->n; ++i) {
+    for (i = 0; i < ctx->n; ++i) {
         x = (double)i * ctx->h;    /* posicion fisica del nodo: x_i = i * h */
         ctx->f[i] = rhs_value(x);  /* evaluar f(x_i) */
     }
