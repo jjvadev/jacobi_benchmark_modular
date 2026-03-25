@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-Script maestro: Ejecuta las 4 gráficas principales de análisis.
+Script maestro: Ejecuta las gráficas principales de análisis.
 1. Speedup de Threads
 2. Speedup de Processes
 3. Speedup de Optimizaciones Secuenciales
 4. Comparación Global (6 curvas)
+5. Comparación de Paralelismo (8 curvas)
 """
 
 import subprocess
@@ -18,12 +19,13 @@ SCRIPTS = [
     ("plot_speedup_processes.py", "Speedup de Processes"),
     ("plot_sequential_optimizations.py", "Speedup de Optimizaciones Secuenciales"),
     ("plot_6curvas_comparacion_global.py", "Comparación Global (6 curvas)"),
+    ("plot_8curvas_paralelismo.py", "Comparación de Paralelismo (8 curvas)"),
 ]
 
 
 def main():
     print("="*80)
-    print("Generando 4 gráficas de análisis de resultados Jacobi")
+    print(f"Generando {len(SCRIPTS)} gráficas de análisis de resultados Jacobi")
     print("="*80)
     
     failed = []
@@ -32,7 +34,7 @@ def main():
     for i, (script, description) in enumerate(SCRIPTS, start=1):
         script_path = SCRIPTS_DIR / script
         
-        print(f"\n[{i}/4] {description}...")
+        print(f"\n[{i}/{len(SCRIPTS)}] {description}...")
         print("-" * 80)
         
         if not script_path.exists():

@@ -8,6 +8,7 @@ from pathlib import Path
 import csv
 from collections import defaultdict
 import numpy as np
+import math
 
 import matplotlib.pyplot as plt
 
@@ -26,6 +27,28 @@ CSV_FILES = {
     "threads": RESULTS_DIR / "JacobiHilos.csv",
     "processes": RESULTS_DIR / "JacobiProc.csv",
 }
+
+
+def n_to_k(n: int) -> int:
+    """Convierte n=2^k+1 a k; retorna None si no cumple la forma esperada."""
+    if n <= 1:
+        return None
+    k = int(round(math.log2(n - 1)))
+    if (1 << k) + 1 != n:
+        return None
+    return k
+
+
+def row_to_k(row: dict) -> int:
+    """Obtiene k desde el CSV: usa columna k si existe, si no lo infiere desde n."""
+    if "k" in row and str(row["k"]).strip() != "":
+        return int(row["k"])
+    return n_to_k(int(row["n"]))
+
+
+def row_to_n(row: dict) -> int:
+    """Obtiene n desde CSV."""
+    return int(row["n"])
 
 
 def read_csv_data(csv_files: dict) -> dict:
@@ -56,7 +79,7 @@ def read_csv_data(csv_files: dict) -> dict:
                 
                 for row in rows:
                     if int(row['workers']) == workers:
-                        n = int(row["n"])
+                        n = row_to_n(row)
                         time_s = float(row["time_s"])
                         times_by_n[n].append(time_s)
                 
@@ -68,7 +91,7 @@ def read_csv_data(csv_files: dict) -> dict:
             times_by_n = defaultdict(list)
             
             for row in rows:
-                n = int(row["n"])
+                n = row_to_n(row)
                 time_s = float(row["time_s"])
                 times_by_n[n].append(time_s)
             
@@ -106,14 +129,14 @@ def calculate_speedups(data: dict) -> dict:
 
 
 def write_speedup_csv(speedups: dict, output_csv: Path) -> None:
-    """Escribe tabla CSV con speedups por variante y tamaño."""
+    """Escribe tabla CSV con speedups por variante y n (k como referencia)."""
     output_csv.parent.mkdir(parents=True, exist_ok=True)
     
     # Extraer tamaños únicos y ordenar
     all_sizes = set()
     for impl_data in speedups.values():
         all_sizes.update(impl_data.keys())
-    sizes = sorted(all_sizes)
+    n_values = sorted(all_sizes)
     
     # Ordenar implementaciones: seq_mem, seq_o3, threads_2/4/8/16, processes_2/4/8/16
     def sort_key(impl):
@@ -137,12 +160,16 @@ def write_speedup_csv(speedups: dict, output_csv: Path) -> None:
         writer = csv.writer(f)
         
         # Encabezado
-        writer.writerow(["Variante"] + [str(n) for n in sizes])
+        headers = ["Variante"]
+        for n in n_values:
+            k = n_to_k(n)
+            headers.append(f"N={n} (k={k})" if k is not None else f"N={n}")
+        writer.writerow(headers)
         
         # Datos
         for impl in implementations:
             row = [impl]
-            for n in sizes:
+            for n in n_values:
                 if n in speedups[impl]:
                     speedup_val = speedups[impl][n]
                     # Formatear como speedup (ej: "3.45x")
@@ -201,7 +228,7 @@ def write_speedup_png(csv_path: Path, output_png: Path) -> None:
             for col_idx in range(n_cols):
                 table[(row_idx, col_idx)].set_facecolor("#F2F2F2")
     
-    plt.title("Tabla resumen: Speedup respecto a seq(O0) por variante y tamaño", 
+    plt.title("Tabla resumen: Speedup respecto a seq(O0) por variante y N (k referencia)", 
               fontsize=13, fontweight="bold", pad=20)
     fig.tight_layout()
     fig.savefig(output_png, dpi=300, bbox_inches="tight")
@@ -216,7 +243,9 @@ def main():
         raise ValueError("No se pudieron leer datos de los CSVs")
     
     print(f"Variantes encontradas: {list(data.keys())}")
-    print(f"Tamaños encontrados: {sorted(set(n for d in data.values() for n in d.keys()))}")
+    all_n = sorted(set(n for d in data.values() for n in d.keys()))
+    print(f"N encontrados: {all_n}")
+    print(f"k de referencia: {[n_to_k(n) for n in all_n]}")
     
     print("\nCalculando speedups (respecto a seq baseline)...")
     speedups = calculate_speedups(data)
