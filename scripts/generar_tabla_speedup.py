@@ -61,7 +61,7 @@ def read_csv_data(csv_files: dict) -> dict:
     
     for impl, csv_path in csv_files.items():
         if not csv_path.exists():
-            print(f"⚠ Advertencia: No existe {csv_path}, saltando...")
+            print(f"WARNING: No existe {csv_path}, saltando...")
             continue
         
         with csv_path.open("r", encoding="utf-8") as f:
@@ -256,7 +256,7 @@ def main():
     print(f"Generando PNG: {OUTPUT_PNG}")
     write_speedup_png(OUTPUT_CSV, OUTPUT_PNG)
     
-    print("\n✓ Tablas de speedup generadas exitosamente")
+    print("\nOK: Tablas de speedup generadas exitosamente")
 
 
 if __name__ == "__main__":

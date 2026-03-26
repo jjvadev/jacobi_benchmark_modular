@@ -10,6 +10,7 @@ from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 SCRIPTS = [
+    ("generar_tablas_por_ejecucion.py", "Tablas por ejecucion (iteraciones, promedio y speedup)"),
     ("generar_tabla_promedios.py", "Tabla de promedios (wall_s)"),
     ("generar_tabla_speedup.py", "Tabla de speedup"),
 ]
@@ -30,7 +31,7 @@ def main():
         print("-" * 80)
         
         if not script_path.exists():
-            print(f"✗ {script}: archivo no encontrado")
+            print(f"ERROR: {script}: archivo no encontrado")
             failed.append((script, description))
             continue
         
@@ -48,16 +49,16 @@ def main():
                     print(result.stdout)
                 successful.append((script, description))
             else:
-                print(f"✗ {description}: error durante ejecución")
+                print(f"ERROR: {description}: error durante ejecucion")
                 if result.stderr:
                     print("  Error:", result.stderr[:500])
                 failed.append((script, description))
         
         except subprocess.TimeoutExpired:
-            print(f"✗ {description}: timeout (>60s)")
+            print(f"ERROR: {description}: timeout (>60s)")
             failed.append((script, description))
         except Exception as e:
-            print(f"✗ {description}: {e}")
+            print(f"ERROR: {description}: {e}")
             failed.append((script, description))
     
     # Resumen final
@@ -66,14 +67,14 @@ def main():
     print("="*80)
     
     if successful:
-        print(f"\n✓ Tablas generadas exitosamente ({len(successful)}/{len(SCRIPTS)}):")
+        print(f"\nOK: Tablas generadas exitosamente ({len(successful)}/{len(SCRIPTS)}):")
         for script, desc in successful:
-            print(f"  • {desc}")
+            print(f"  - {desc}")
     
     if failed:
-        print(f"\n✗ Fallos ({len(failed)}/{len(SCRIPTS)}):")
+        print(f"\nERROR: Fallos ({len(failed)}/{len(SCRIPTS)}):")
         for script, desc in failed:
-            print(f"  • {desc}")
+            print(f"  - {desc}")
         return 1
     
     print("\n" + "="*80)
